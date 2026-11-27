@@ -6,7 +6,7 @@
   <title>DarsBox — Ta'lim CRM</title>
 
   <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#4f46e5">
+  <meta id="themeColorMeta" name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="DarsBox">
@@ -14,14 +14,20 @@
   <link rel="apple-touch-icon" href="./192.ikon.png">
 
   <style>
+    :root {
+      --app-bg: #ffffff;
+      --spinner-track: #e2e8f0;
+      --spinner-accent: #4f46e5;
+    }
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #f8fafc;
+      background: var(--app-bg);
       font-family: system-ui, -apple-system, sans-serif;
+      transition: background-color 0.2s ease;
     }
     #loader {
       position: fixed;
@@ -31,9 +37,9 @@
       align-items: center;
       justify-content: center;
       gap: 14px;
-      background: #f8fafc;
+      background: var(--app-bg);
       z-index: 10;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.25s ease, background-color 0.2s ease;
     }
     #loader img {
       width: 72px;
@@ -43,8 +49,8 @@
     .spinner {
       width: 28px;
       height: 28px;
-      border: 3px solid #e2e8f0;
-      border-top-color: #4f46e5;
+      border: 3px solid var(--spinner-track);
+      border-top-color: var(--spinner-accent);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
@@ -56,6 +62,7 @@
       height: 100dvh;
       border: none;
       display: block;
+      background: var(--app-bg);
     }
   </style>
 </head>
@@ -73,8 +80,39 @@
   </iframe>
 
   <script>
+    var STORAGE_KEY = 'darsbox_theme_prefs';
     var loaderEl = document.getElementById('loader');
     var frameEl = document.getElementById('appFrame');
+    var themeMetaEl = document.getElementById('themeColorMeta');
+
+    function isSafeColor(val) {
+      return typeof val === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(val.trim());
+    }
+
+    function applyTheme(prefs) {
+      if (!prefs || typeof prefs !== 'object') return;
+      var bg = isSafeColor(prefs.bg) ? prefs.bg.trim() : null;
+      var theme = isSafeColor(prefs.theme) ? prefs.theme.trim() : bg;
+      var accent = isSafeColor(prefs.accent) ? prefs.accent.trim() : null;
+
+      if (bg) {
+        document.documentElement.style.setProperty('--app-bg', bg);
+      }
+      if (accent) {
+        document.documentElement.style.setProperty('--spinner-accent', accent);
+      }
+      if (theme && themeMetaEl) {
+        themeMetaEl.setAttribute('content', theme);
+      }
+    }
+
+    // Oldin saqlangan rangni darhol qo'llash
+    try {
+      var savedRaw = localStorage.getItem(STORAGE_KEY);
+      if (savedRaw) {
+        applyTheme(JSON.parse(savedRaw));
+      }
+    } catch (e) {}
 
     function hideLoader() {
       if (!loaderEl) return;
@@ -90,9 +128,11 @@
 
     frameEl.addEventListener('load', hideLoader);
 
-    // ASOSIY Google Sheets dan boshqa CRM havolasi kelganda shu iframe ichida ochadi
     window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'DARSBOX_NAVIGATE' && typeof e.data.url === 'string') {
+      if (!e.data || typeof e.data !== 'object') return;
+
+      // 1. Ikkinchi CRM havolasini PWA ichida ochish
+      if (e.data.type === 'DARSBOX_NAVIGATE' && typeof e.data.url === 'string') {
         if (e.data.url.indexOf('https://script.google.com/') === 0) {
           if (e.source) {
             try { e.source.postMessage({ type: 'DARSBOX_NAV_OK' }, '*'); } catch (err) {}
@@ -100,6 +140,19 @@
           showLoader();
           frameEl.src = e.data.url;
         }
+      }
+
+      // 2. Foydalanuvchi tanlagan rangga moslash
+      if (e.data.type === 'DARSBOX_THEME') {
+        var nextPrefs = {
+          bg: e.data.bg,
+          theme: e.data.theme || e.data.bg,
+          accent: e.data.accent
+        };
+        applyTheme(nextPrefs);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPrefs));
+        } catch (err) {}
       }
     });
 
