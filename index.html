@@ -69,11 +69,40 @@
     id="appFrame"
     src="https://script.google.com/macros/s/AKfycbzj6mFTTbTyiCvlJi-UrpjTRXyUKweMHj_fSJiOVkhb85Y0rVdyUNdP9i1etC9IfPF9Zw/exec"
     allow="camera; microphone; geolocation; clipboard-read; clipboard-write"
-    allowfullscreen
-    onload="var l=document.getElementById('loader'); if(l){ l.style.opacity='0'; setTimeout(function(){ l.remove(); }, 260); }">
+    allowfullscreen>
   </iframe>
 
   <script>
+    var loaderEl = document.getElementById('loader');
+    var frameEl = document.getElementById('appFrame');
+
+    function hideLoader() {
+      if (!loaderEl) return;
+      loaderEl.style.opacity = '0';
+      setTimeout(function() { loaderEl.style.display = 'none'; }, 260);
+    }
+
+    function showLoader() {
+      if (!loaderEl) return;
+      loaderEl.style.display = 'flex';
+      loaderEl.style.opacity = '1';
+    }
+
+    frameEl.addEventListener('load', hideLoader);
+
+    // ASOSIY Google Sheets dan boshqa CRM havolasi kelganda shu iframe ichida ochadi
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'DARSBOX_NAVIGATE' && typeof e.data.url === 'string') {
+        if (e.data.url.indexOf('https://script.google.com/') === 0) {
+          if (e.source) {
+            try { e.source.postMessage({ type: 'DARSBOX_NAV_OK' }, '*'); } catch (err) {}
+          }
+          showLoader();
+          frameEl.src = e.data.url;
+        }
+      }
+    });
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('./sw.js').catch(function() {});
