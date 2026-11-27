@@ -161,6 +161,37 @@
         navigator.serviceWorker.register('./sw.js').catch(function() {});
       });
     }
+    function showSystemAlert(title, body, iconUrl) {
+  if (!('Notification' in window)) return;
+
+  var sendNotif = function() {
+    var options = {
+      body: body || '',
+      icon: iconUrl || './192.ikon.png',
+      badge: './192.ikon.png'
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then(function(reg) {
+        reg.showNotification(title || 'DarsBox', options).catch(function() {
+          new Notification(title || 'DarsBox', options);
+        });
+      }).catch(function() {
+        new Notification(title || 'DarsBox', options);
+      });
+    } else {
+      new Notification(title || 'DarsBox', options);
+    }
+  };
+
+  if (Notification.permission === 'granted') {
+    sendNotif();
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(function(permission) {
+      if (permission === 'granted') sendNotif();
+    });
+  }
+}
   </script>
 </body>
 </html>
