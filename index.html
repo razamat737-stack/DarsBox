@@ -106,7 +106,7 @@
       }
     }
 
-    // Oldin saqlangan rangni darhol qo'llash
+    // Oldin saqlangan fon va tema rangini darhol qo'llash
     try {
       var savedRaw = localStorage.getItem(STORAGE_KEY);
       if (savedRaw) {
@@ -128,10 +128,44 @@
 
     frameEl.addEventListener('load', hideLoader);
 
+    // Tizim bildirishnomasini (ilova tepasida) ko'rsatish
+    function showSystemAlert(title, body, iconUrl) {
+      if (!('Notification' in window)) return;
+
+      var sendNotif = function() {
+        var options = {
+          body: body || '',
+          icon: iconUrl || './192.ikon.png',
+          badge: './192.ikon.png'
+        };
+
+        if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+          navigator.serviceWorker.ready.then(function(reg) {
+            reg.showNotification(title || 'DarsBox', options).catch(function() {
+              new Notification(title || 'DarsBox', options);
+            });
+          }).catch(function() {
+            new Notification(title || 'DarsBox', options);
+          });
+        } else {
+          new Notification(title || 'DarsBox', options);
+        }
+      };
+
+      if (Notification.permission === 'granted') {
+        sendNotif();
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(function(permission) {
+          if (permission === 'granted') sendNotif();
+        });
+      }
+    }
+
+    // CRM (iframe) dan keladigan xabarlarni qabul qilish
     window.addEventListener('message', function(e) {
       if (!e.data || typeof e.data !== 'object') return;
 
-      // 1. Ikkinchi CRM havolasini PWA ichida ochish
+      // 1. Boshqa Google Sheets CRM havolasini shu iframe ichida ochish
       if (e.data.type === 'DARSBOX_NAVIGATE' && typeof e.data.url === 'string') {
         if (e.data.url.indexOf('https://script.google.com/') === 0) {
           if (e.source) {
@@ -142,7 +176,7 @@
         }
       }
 
-      // 2. Foydalanuvchi tanlagan rangga moslash
+      // 2. Tanlangan fon va sarlavha rangini qo'llash
       if (e.data.type === 'DARSBOX_THEME') {
         var nextPrefs = {
           bg: e.data.bg,
@@ -154,6 +188,18 @@
           localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPrefs));
         } catch (err) {}
       }
+
+      // 3. Ilova tepasida tizim bildirishnomasini chiqarish
+      if (e.data.type === 'DARSBOX_NOTIFY') {
+        showSystemAlert(e.data.title, e.data.body, e.data.icon);
+      }
+
+      // 4. Bildirishnoma ruxsatini oldindan so'rash
+      if (e.data.type === 'DARSBOX_ASK_NOTIFY_PERMISSION') {
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
     });
 
     if ('serviceWorker' in navigator) {
@@ -161,37 +207,6 @@
         navigator.serviceWorker.register('./sw.js').catch(function() {});
       });
     }
-    function showSystemAlert(title, body, iconUrl) {
-  if (!('Notification' in window)) return;
-
-  var sendNotif = function() {
-    var options = {
-      body: body || '',
-      icon: iconUrl || './192.ikon.png',
-      badge: './192.ikon.png'
-    };
-
-    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-      navigator.serviceWorker.ready.then(function(reg) {
-        reg.showNotification(title || 'DarsBox', options).catch(function() {
-          new Notification(title || 'DarsBox', options);
-        });
-      }).catch(function() {
-        new Notification(title || 'DarsBox', options);
-      });
-    } else {
-      new Notification(title || 'DarsBox', options);
-    }
-  };
-
-  if (Notification.permission === 'granted') {
-    sendNotif();
-  } else if (Notification.permission !== 'denied') {
-    Notification.requestPermission().then(function(permission) {
-      if (permission === 'granted') sendNotif();
-    });
-  }
-}
   </script>
 </body>
 </html>
