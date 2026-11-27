@@ -81,6 +81,7 @@
 
   <script>
     var STORAGE_KEY = 'darsbox_theme_prefs';
+    var NOTIFY_ASKED_KEY = 'darsbox_notify_asked_v1';
     var loaderEl = document.getElementById('loader');
     var frameEl = document.getElementById('appFrame');
     var themeMetaEl = document.getElementById('themeColorMeta');
@@ -128,6 +129,16 @@
 
     frameEl.addEventListener('load', hideLoader);
 
+    function requestNotifyOnce() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'default') return;
+      try {
+        if (localStorage.getItem(NOTIFY_ASKED_KEY) === '1') return;
+        localStorage.setItem(NOTIFY_ASKED_KEY, '1');
+      } catch (e) {}
+      Notification.requestPermission();
+    }
+
     // Tizim bildirishnomasini (ilova tepasida) ko'rsatish
     function showSystemAlert(title, body, iconUrl) {
       if (!('Notification' in window)) return;
@@ -154,7 +165,12 @@
 
       if (Notification.permission === 'granted') {
         sendNotif();
-      } else if (Notification.permission !== 'denied') {
+      } else if (Notification.permission === 'default') {
+        var alreadyAsked = false;
+        try { alreadyAsked = localStorage.getItem(NOTIFY_ASKED_KEY) === '1'; } catch (e) {}
+        if (alreadyAsked) return;
+        try { localStorage.setItem(NOTIFY_ASKED_KEY, '1'); } catch (e) {}
+
         Notification.requestPermission().then(function(permission) {
           if (permission === 'granted') sendNotif();
         });
@@ -194,11 +210,9 @@
         showSystemAlert(e.data.title, e.data.body, e.data.icon);
       }
 
-      // 4. Bildirishnoma ruxsatini oldindan so'rash
+      // 4. Bildirishnoma ruxsatini faqat bir marta so'rash
       if (e.data.type === 'DARSBOX_ASK_NOTIFY_PERMISSION') {
-        if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission();
-        }
+        requestNotifyOnce();
       }
     });
 
