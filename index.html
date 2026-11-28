@@ -13,6 +13,8 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./192.ikon.png">
   <link rel="apple-touch-icon" href="./192.ikon.png">
 
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.js" defer></script>
+
   <style>
     :root {
       --app-bg: #ffffff;
@@ -84,10 +86,38 @@
     var STORAGE_KEY = 'darsbox_theme_prefs';
     var NOTIFY_ASKED_KEY = 'darsbox_notify_asked_v1';
     var DEFAULT_ICON_URL = 'https://razamat737-stack.github.io/DarsBox/192.ikon.png';
+    var ONESIGNAL_APP_ID = 'a4f5a8b6-dc16-415b-884f-c0e340f3d643';
 
     var loaderEl = document.getElementById('loader');
     var frameEl = document.getElementById('appFrame');
     var themeMetaEl = document.getElementById('themeColorMeta');
+
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        serviceWorkerPath: 'sw.js',
+        serviceWorkerParam: { scope: '/DarsBox/' },
+        allowLocalhostAsSecureOrigin: true
+      });
+    });
+
+    function normalizeOneSignalExternalId(rawId) {
+      var digits = String(rawId || '').replace(/\D/g, '');
+      if (digits.length >= 9) return digits.slice(-9);
+      return String(rawId || '').trim();
+    }
+
+    function bindOneSignalExternalId(externalId) {
+      var cleanId = normalizeOneSignalExternalId(externalId);
+      if (!cleanId) return;
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        try {
+          await OneSignal.login(cleanId);
+        } catch (err) {}
+      });
+    }
 
     function isSafeColor(val) {
       return typeof val === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(val.trim());
@@ -143,13 +173,24 @@
     frameEl.src = initialUrl;
 
     function requestNotifyOnce() {
-      if (!('Notification' in window)) return;
-      if (Notification.permission !== 'default') return;
-      try {
-        if (localStorage.getItem(NOTIFY_ASKED_KEY) === '1') return;
-        localStorage.setItem(NOTIFY_ASKED_KEY, '1');
-      } catch (e) {}
-      Notification.requestPermission();
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        try {
+          if (OneSignal.Notifications && OneSignal.Notifications.permission) return;
+          if (OneSignal.Slidedown && typeof OneSignal.Slidedown.promptPush === 'function') {
+            await OneSignal.Slidedown.promptPush();
+            return;
+          }
+        } catch (err) {}
+
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'default') return;
+        try {
+          if (localStorage.getItem(NOTIFY_ASKED_KEY) === '1') return;
+          localStorage.setItem(NOTIFY_ASKED_KEY, '1');
+        } catch (e) {}
+        Notification.requestPermission();
+      });
     }
 
     // Tizim bildirishnomasini (ilova tepasida) ko'rsatish
@@ -246,6 +287,11 @@
       // 5. Bildirishnoma ruxsatini faqat bir marta so'rash
       if (e.data.type === 'DARSBOX_ASK_NOTIFY_PERMISSION') {
         requestNotifyOnce();
+      }
+
+      // 6. Kabinetdagi foydalanuvchi ID/telefonini OneSignal bilan bog'lash
+      if (e.data.type === 'DARSBOX_SET_USER' && e.data.userId) {
+        bindOneSignalExternalId(e.data.userId);
       }
     });
 
