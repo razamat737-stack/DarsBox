@@ -74,15 +74,17 @@
 
   <iframe
     id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbzj6mFTTbTyiCvlJi-UrpjTRXyUKweMHj_fSJiOVkhb85Y0rVdyUNdP9i1etC9IfPF9Zw/exec"
     allow="camera; microphone; geolocation; clipboard-read; clipboard-write"
     allowfullscreen>
   </iframe>
 
   <script>
+    var MAIN_HUB_URL = 'https://script.google.com/macros/s/AKfycbzj6mFTTbTyiCvlJi-UrpjTRXyUKweMHj_fSJiOVkhb85Y0rVdyUNdP9i1etC9IfPF9Zw/exec';
+    var ACTIVE_CENTER_KEY = 'darsbox_active_center_url';
     var STORAGE_KEY = 'darsbox_theme_prefs';
     var NOTIFY_ASKED_KEY = 'darsbox_notify_asked_v1';
     var DEFAULT_ICON_URL = 'https://razamat737-stack.github.io/DarsBox/192.ikon.png';
+
     var loaderEl = document.getElementById('loader');
     var frameEl = document.getElementById('appFrame');
     var themeMetaEl = document.getElementById('themeColorMeta');
@@ -129,6 +131,16 @@
     }
 
     frameEl.addEventListener('load', hideLoader);
+
+    // Saqlangan markaz havolasi bo'lsa o'shani, bo'lmasa asosiy Google sahifani ochish
+    var initialUrl = MAIN_HUB_URL;
+    try {
+      var savedCenter = localStorage.getItem(ACTIVE_CENTER_KEY);
+      if (savedCenter && savedCenter.indexOf('https://script.google.com/') === 0) {
+        initialUrl = savedCenter;
+      }
+    } catch (e) {}
+    frameEl.src = initialUrl;
 
     function requestNotifyOnce() {
       if (!('Notification' in window)) return;
@@ -189,9 +201,13 @@
     window.addEventListener('message', function(e) {
       if (!e.data || typeof e.data !== 'object') return;
 
-      // 1. Boshqa Google Sheets CRM havolasini shu iframe ichida ochish
+      // 1. Markaz tanlanganda havolasini saqlab, shu iframe ichida ochish
       if (e.data.type === 'DARSBOX_NAVIGATE' && typeof e.data.url === 'string') {
         if (e.data.url.indexOf('https://script.google.com/') === 0) {
+          try {
+            localStorage.setItem(ACTIVE_CENTER_KEY, e.data.url);
+          } catch (err) {}
+
           if (e.source) {
             try { e.source.postMessage({ type: 'DARSBOX_NAV_OK' }, '*'); } catch (err) {}
           }
@@ -200,7 +216,16 @@
         }
       }
 
-      // 2. Tanlangan fon va sarlavha rangini qo'llash
+      // 2. Akkountdan to'liq chiqilganda ilova boshiga (markaz tanlashga) qaytarish
+      if (e.data.type === 'DARSBOX_GO_HOME') {
+        try {
+          localStorage.removeItem(ACTIVE_CENTER_KEY);
+        } catch (err) {}
+        showLoader();
+        frameEl.src = MAIN_HUB_URL;
+      }
+
+      // 3. Tanlangan fon va sarlavha rangini qo'llash
       if (e.data.type === 'DARSBOX_THEME') {
         var nextPrefs = {
           bg: e.data.bg,
@@ -213,12 +238,12 @@
         } catch (err) {}
       }
 
-      // 3. Ilova tepasida tizim bildirishnomasini chiqarish
+      // 4. Ilova tepasida tizim bildirishnomasini chiqarish
       if (e.data.type === 'DARSBOX_NOTIFY') {
         showSystemAlert(e.data.title, e.data.body, e.data.icon);
       }
 
-      // 4. Bildirishnoma ruxsatini faqat bir marta so'rash
+      // 5. Bildirishnoma ruxsatini faqat bir marta so'rash
       if (e.data.type === 'DARSBOX_ASK_NOTIFY_PERMISSION') {
         requestNotifyOnce();
       }
