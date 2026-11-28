@@ -82,6 +82,7 @@
   <script>
     var STORAGE_KEY = 'darsbox_theme_prefs';
     var NOTIFY_ASKED_KEY = 'darsbox_notify_asked_v1';
+    var DEFAULT_ICON_URL = 'https://razamat737-stack.github.io/DarsBox/192.ikon.png';
     var loaderEl = document.getElementById('loader');
     var frameEl = document.getElementById('appFrame');
     var themeMetaEl = document.getElementById('themeColorMeta');
@@ -143,11 +144,18 @@
     function showSystemAlert(title, body, iconUrl) {
       if (!('Notification' in window)) return;
 
+      var finalIcon = (typeof iconUrl === 'string' && iconUrl.indexOf('http') === 0)
+        ? iconUrl
+        : DEFAULT_ICON_URL;
+      var notifTag = 'darsbox_' + (title || 'alert') + '_' + (body || '');
+
       var sendNotif = function() {
         var options = {
           body: body || '',
-          icon: iconUrl || './192.ikon.png',
-          badge: './192.ikon.png'
+          icon: finalIcon,
+          badge: DEFAULT_ICON_URL,
+          tag: notifTag,
+          renotify: false
         };
 
         if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
